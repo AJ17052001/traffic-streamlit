@@ -1,5 +1,4 @@
 import os
-import requests
 import streamlit as st
 import numpy as np
 import cv2
@@ -16,29 +15,23 @@ st.set_page_config(
 st.title("🚦 German Traffic Sign Recognition")
 st.write("Upload a traffic sign image below to run YOLOv8 model predictions.")
 
-# --- Model Downloader / Loader ---
+# --- Load Model directly from local directory ---
 MODEL_PATH = "best.pt"
 
 @st.cache_resource
 def load_model():
-    # If best.pt is missing or corrupted (under 1MB, e.g. Git LFS pointer text file)
-    if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 1000000:
-        st.info("Downloading model weights (`best.pt`)... Please wait.")
+    # Verify the file exists locally
+    if not os.path.exists(MODEL_PATH):
+        st.error(f"Error: Could not find '{MODEL_PATH}' in the root directory!")
+        st.info("Make sure 'best.pt' is uploaded directly to your GitHub repository in the same folder as app.py.")
+        st.stop()
         
-        # Public direct raw download link for best.pt (Fallback)
-        # REPLACE THIS URL with your own direct raw file link if host online!
-        url = "https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME/raw/main/best.pt"
-        
-        response = requests.get(url, stream=True)
-        if response.status_code == 200:
-            with open(MODEL_PATH, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            st.success("Model downloaded successfully!")
-        else:
-            st.error("Failed to download model file. Please make sure best.pt is correctly uploaded to GitHub.")
-            st.stop()
-            
+    # Check if the file is just a git-lfs pointer file (1KB instead of ~6-15MB)
+    if os.path.getsize(MODEL_PATH) < 100000:
+        st.error("Error: 'best.pt' appears to be corrupted or a Git LFS pointer text file (< 100 KB).")
+        st.info("Please delete 'best.pt' from GitHub and re-upload the real binary model file directly using 'Upload files' on GitHub.com.")
+        st.stop()
+
     model = YOLO(MODEL_PATH)
     return model
 
@@ -107,4 +100,4 @@ if uploaded_file is not None:
                 for item in detected_items:
                     st.markdown(f"- {item}")
             else:
-                st.warning("No traffic sign detected at the current confidence threshold (0.3).")
+                st.warning("No traffic sign detected at confidence threshold 0.3.")
