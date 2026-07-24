@@ -1,26 +1,27 @@
 import os
 import sys
 
-# 1. Disable Ultralytics requirement auto-update checks via Environment Variables
+# 1. Disable Ultralytics auto-installer checks
 os.environ["AUTOINSTALL"] = "false"
 os.environ["YOLO_AUTOINSTALL"] = "false"
 
-# 2. Add base directory so Python resolves the local 'nets' package (__init__.py)
+# 2. Register base directory so Python resolves 'nets' and 'nets.nn'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(BASE_DIR)
+if BASE_DIR not in sys.path:
+    sys.path.append(BASE_DIR)
 
 import urllib.request
 import streamlit as st
 from PIL import Image
 
-# Disable requirements check directly inside Ultralytics checks module
+# Disable requirement checks in Ultralytics internal settings
 import ultralytics.utils.checks as checks
 checks.AUTOINSTALL = False
 
 from ultralytics import YOLO
 
 # -----------------------------------------------------------------------------
-# Streamlit App Setup
+# Streamlit Configuration
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="German Traffic Sign Recognition", 
@@ -32,15 +33,15 @@ MODEL_PATH = "best.pt"
 MODEL_URL = "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.pt"
 
 # -----------------------------------------------------------------------------
-# Model Loader
+# Model Loading
 # -----------------------------------------------------------------------------
 @st.cache_resource
 def load_yolo_model():
     """
-    Downloads binary weights directly to the container if missing or corrupt.
+    Downloads binary weights directly if missing or corrupted pointer file.
     """
     if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 100000:
-        with st.spinner("Downloading model weights..."):
+        with st.spinner("Downloading pre-trained model weights..."):
             urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
             
     return YOLO(MODEL_PATH)
@@ -52,7 +53,7 @@ except Exception as e:
     st.stop()
 
 # -----------------------------------------------------------------------------
-# User Interface & Detection
+# User Interface
 # -----------------------------------------------------------------------------
 st.title("🚦 German Traffic Sign Recognition")
 st.write("Upload a traffic sign image below to run YOLOv8 model predictions.")
@@ -89,4 +90,4 @@ if uploaded_file is not None:
             label = model.names[cls_id]
             st.write(f"• **Detected:** `{label}` | **Confidence:** `{conf:.2%}`")
     else:
-        st.info("No traffic signs detected in the image.")
+        st.info("No objects detected in the uploaded image.")
