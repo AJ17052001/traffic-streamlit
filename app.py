@@ -1,40 +1,51 @@
 import os
+import sys
 import urllib.request
 import streamlit as st
 from PIL import Image
+
+# -----------------------------------------------------------------------------
+# Path Fix for 'nets' Module (Prevents ModuleNotFoundError)
+# -----------------------------------------------------------------------------
+try:
+    import tf_slim
+    sys.path.append(os.path.join(os.path.dirname(tf_slim.__file__), "nets"))
+except ImportError:
+    pass
+
 from ultralytics import YOLO
 
 # -----------------------------------------------------------------------------
-# Configuration
+# Streamlit App Setup
 # -----------------------------------------------------------------------------
-st.set_page_config(page_title="German Traffic Sign Recognition", page_icon="🚦", layout="centered")
+st.set_page_config(
+    page_title="German Traffic Sign Recognition", 
+    page_icon="🚦", 
+    layout="centered"
+)
 
 MODEL_PATH = "best.pt"
-
-# Pre-trained YOLO model weights URL
-# This link directly fetches a working YOLO model binary so you don't need local datasets
 MODEL_URL = "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.pt"
 
 # -----------------------------------------------------------------------------
-# Helper Function: Download & Load Model Dynamically
+# Dynamic Model Downloader & Loader
 # -----------------------------------------------------------------------------
 @st.cache_resource
-def load_model():
+def load_yolo_model():
     """
-    Downloads the actual binary weights from cloud storage if missing,
-    ensuring Streamlit Cloud does not crash on empty/pointer files.
+    Downloads binary weights if missing or corrupted pointer text file.
     """
     if not os.path.exists(MODEL_PATH) or os.path.getsize(MODEL_PATH) < 100000:
-        with st.spinner("Downloading model weights for first-time setup..."):
+        with st.spinner("Downloading pre-trained model weights for first-time launch..."):
             urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
-    
+            
     return YOLO(MODEL_PATH)
 
-# Load the model
+# Load the YOLO model
 try:
-    model = load_model()
+    model = load_yolo_model()
 except Exception as e:
-    st.error(f"Failed to load the model: {e}")
+    st.error(f"Failed to load model: {e}")
     st.stop()
 
 # -----------------------------------------------------------------------------
@@ -43,10 +54,12 @@ except Exception as e:
 st.title("🚦 German Traffic Sign Recognition")
 st.write("Upload a traffic sign image below to run YOLOv8 model predictions.")
 
-uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png", "webp"])
+uploaded_file = st.file_uploader(
+    "Upload an image", 
+    type=["jpg", "jpeg", "png", "bmp", "webp"]
+)
 
 if uploaded_file is not None:
-    # Read uploaded image
     image = Image.open(uploaded_file)
     
     col1, col2 = st.columns(2)
@@ -55,8 +68,7 @@ if uploaded_file is not None:
         st.subheader("Original Image")
         st.image(image, use_container_width=True)
 
-    # Inference
-    with st.spinner("Detecting traffic signs..."):
+    with st.spinner("Running detection..."):
         results = model(image)
         res_plotted = results[0].plot()
 
@@ -64,7 +76,6 @@ if uploaded_file is not None:
         st.subheader("YOLOv8 Detection")
         st.image(res_plotted, channels="BGR", use_container_width=True)
 
-    # Show results detail
     st.markdown("---")
     st.subheader("Detection Summary")
     boxes = results[0].boxes
@@ -75,5 +86,4 @@ if uploaded_file is not None:
             label = model.names[cls_id]
             st.write(f"• **Detected:** `{label}` | **Confidence:** `{conf:.2%}`")
     else:
-        st.info("No objects detected in the uploaded image.")
-               
+        st.info("No traffic signs detected in the image.")
